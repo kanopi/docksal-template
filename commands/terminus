@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+#: exec_target = cli
+
+## Run project's Terminus
+##
+## Usage: fin terminus [aruments]
+##
+##
+
+if [ -z $TERMINUS_TOKEN ]; then
+  echo "TERMINUS_TOKEN must be present in the docksal-local.env"
+  exit 1
+fi
+
+if [ $1 = 'install' ]; then
+
+## Install Terminus
+echo "Installing Terminus..."
+composer global require -n hirak/prestissimo
+cgr pantheon-systems/terminus
+
+elif [ $1 = 'login' ]; then
+  terminus auth:login --machine-token=$TERMINUS_TOKEN
+else
+  terminus $*
+fi
