@@ -1,0 +1,2 @@
+# docksal-template
+Docksal Template
