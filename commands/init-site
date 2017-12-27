@@ -9,11 +9,15 @@
 # Abort if anything fails
 set -e
 
+SOURCE="${BASH_SOURCE[0]}"
+DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+. $DIR/helper_functions
+
 #-------------------------- Settings --------------------------------
 
-ENVIRONMENT=$1
+PROCESS=${1:-install}
 # PROJECT_ROOT and DOCROOT are set as env variables in cli
-SITE_DIRECTORY="default"
+SITE_DIRECTORY=${SITE_DIRECTORY:-default}
 DOCROOT_PATH="${PROJECT_ROOT}/${DOCROOT}"
 SITEDIR_PATH="${DOCROOT_PATH}/sites/${SITE_DIRECTORY}"
 
@@ -31,10 +35,10 @@ copy_settings_file()
 	local dest="$2"
 
 	if [[ ! -f $dest ]]; then
-		echo "Copying ${dest}..."
+		echo-green "Copying ${dest}..."
 		cp $source $dest
 	else
-		echo "${dest} already in place."
+		echo-yellow "${dest} already in place."
 	fi
 }
 
@@ -46,20 +50,43 @@ copy_settings_file()
 init_settings ()
 {
   if [ ${FRAMEWORK} ==  'd7' ] || [ ${FRAMEWORK} == 'd8' ]; then
-	 # Copy from settings templates
-	 copy_settings_file "/var/www/.docksal/etc/framework/drupal/settings.php" "${SITEDIR_PATH}/settings.php"
+	 	# Copy from settings templates
+	 	copy_settings_file "/var/www/.docksal/etc/framework/${FRAMEWORK}/settings.php" "${SITEDIR_PATH}/settings.php"
   elif [ ${FRAMEWORK} == 'wp' ]; then
-    copy_settings_file "/var/www/.docksal/etc/framework/wordpress/wp-config.php" "${DOCROOT_PATH}/wp-config.php"
+    copy_settings_file "/var/www/.docksal/etc/framework/${FRAMEWORK}/wp-config.php" "${DOCROOT_PATH}/wp-config.php"
   fi
 }
 
 # Fix file/folder permissions
 fix_permissions ()
 {
-	echo "Making site directory writable..."
-  mkdir -p "${SITEDIR_PATH}/files/private"
-	chmod 755 "${SITEDIR_PATH}"
-	chmod 755 "${SITEDIR_PATH}/files/private"
+	if [ ${FRAMEWORK} ==  'd7' ] || [ ${FRAMEWORK} == 'd8' ]; then
+		echo "Making site directory writable..."
+	  mkdir -p "${SITEDIR_PATH}/files/private"
+		chmod 755 "${SITEDIR_PATH}"
+		chmod 755 "${SITEDIR_PATH}/files/private"
+	fi
+}
+
+# Install site
+site_install ()
+{
+	cd $DOCROOT_PATH
+
+	if [ ${FRAMEWORK} ==  'd7' ] || [ ${FRAMEWORK} == 'd8' ]; then
+		drush site-install -y \
+			--site-name=${SITE_NAME} \
+			--account-mail=${ADMIN_EMAIL} \
+			--account-name=${ADMIN_NAME} \
+			--account-pass=${ADMIN_PASS}
+	elif [ ${FRAMEWORK} == 'wp' ]; then
+		wp core install \
+			--url=${VIRTUAL_HOST} \
+			--title=${SITE_NAME} \
+			--admin_user=${ADMIN_USER} \
+			--admin_password=${ADMIN_PASS} \
+			--admin_email=${ADMIN_EMAIL}
+	fi
 }
 
 #-------------------------- END: Functions --------------------------------
@@ -72,13 +99,24 @@ sudo localedef -i en_US -f UTF-8 en_US.UTF-8
 
 fix_permissions
 # Project initialization steps
-if [ $PANTHEON_ENABLE = 1 ]; then
-  /var/www/.docksal/commands/terminus install
-else
-
-fi
+case "${HOSTING}" in
+	'pantheon'*)
+		${DIR}/terminus install
+		;;
+	'platform.sh'*)
+		${DIR}/platform.sh install
+		;;
+esac
 
 init_settings
 
-/var/www/.docksal/commands/refresh
+case "${CMD}" in
+	'install'*)
+		site_install()
+		;;
+	'recreate'*)
+		${DIR}/refresh
+		;;
+esac
+
 #-------------------------- END: Execution --------------------------------

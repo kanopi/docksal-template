@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+
+## Pull latest version of database files and contents from site.
+##
+## Usage: fin refresh -e [environment]
+
+# Abort if anything fails
+set -e
+
+ENVIRONMENT=prod
+DATABASE=false
+FILES=false
+
+function_exists() {
+    declare -f -F $1 > /dev/null
+    return $?
+}
+
+while getopts 'e:d:f:' flag; do
+  case "${flag}" in
+    e)
+      ENVIRONMENT="${OPTARG}"
+      ;;
+    d)
+      if [ $OPTARG == 'y' ]; then
+        DATABASE=true
+      fi
+      ;;
+    f)
+      if [ $OPTARG == 'y' ]; then
+        FILES=true
+      fi
+      ;;
+  esac
+done
+
+cd /var/www/${DOCROOT}
+
+if $FILES; then
+
+  case "${HOSTING}" in
+    'custom'*)
+
+      ;;
+    'pantheon'*)
+
+      if [ ${FRAMEWORK} ==  'd7' ] || [ ${FRAMEWORK} == 'd8' ]; then
+        cd sites/default/files
+      elif [ ${FRAMEWORK} == 'wp' ]; then
+        cd wp-content/uploads
+      fi
+
+      terminus env:wake ${PANTHEON_SITE}.${PANTHEON_ENV}
+      echo "Downloading latest set of files from ${PANTHEON_SITE}..."
+      terminus rsync ${PANTHEON_SITE}.${PANTHEON_ENV}:files/. .
+
+      ;;
+  esac
+
+  case "${FRAMEWORK}" in
+    'd7'*)
+    'd8'*)
+      cd sites/default/files
+
+
+
+      ;;
+    'wp'*)
+      ;;
+  esac
+fi
+
+if $DATABASE; then
+  DBFILE="/tmp/site.${ENVIRONMENT}.sql"
+  if [ ! -f $DBFILE ] || [ ! -z $(find $DBFILE -mmin +60) ] ; then
+
+      if [ ! -f $DBFILE ]; then
+          echo "Database file does not exist."
+      elif [ ! -z $(find $DBFILE -mmin +60) ]; then
+          echo "Database file is older then 1 hours"
+      fi
+
+      echo "Exporting ${ENVIRONMENT} Database..."
+      # Project initialization steps
+      case "${HOSTING}" in
+        'custom'*)
+          if [ ${FRAMEWORK} ==  'd7' ] || [ ${FRAMEWORK} == 'd8' ]; then
+            drush @remote.${ENVIRONMENT} sql-dump > $DBFILE
+          elif [ ${FRAMEWORK} == 'wp' ]; then
+            wp @remote.${ENVIRONMENT} db export $DBFILE
+          fi
+          ;;
+      	'pantheon'*)
+          terminus env:wake ${PANTHEON_SITE}.${PANTHEON_ENV}
+          DBCONN=$(terminus connection:info ${PANTHEON_SITE}.${PANTHEON_ENV} --field="MySQL Command")
+          DBDUMP=${DBCONN/mysql /mysqldump }
+          eval $DBDUMP " --result-file=$DBFILE"
+      		;;
+      esac
+  fi
+
+  echo "Dropping all tables within Database..."
+  if [ ${FRAMEWORK} ==  'd7' ] || [ ${FRAMEWORK} == 'd8' ]; then
+    drush sql-drop -y
+  elif [ ${FRAMEWORK} == 'wp' ]; then
+    wp db reset --yes
+  fi
+
+  echo "Importing Database..."
+  if [ ${FRAMEWORK} ==  'd7' ] || [ ${FRAMEWORK} == 'd8' ]; then
+    drush sql-cli < ${DBFILE}
+  elif [ ${FRAMEWORK} == 'wp' ]; then
+    wp db import ${DBFILE}
+  fi
+fi
+
+
+case "${FRAMEWORK}" in
+  'd7'*)
+    echo "Running Drush Clear Cache...";
+    drush cc all
+
+    echo "Set User 1 username to ${ADMIN_USER}..."
+    drush sql-query "UPDATE users SET mail=\"${ADMIN_EMAIL}\", name=\"${ADMIN_USER}\" WHERE uid=1"
+
+    echo "Reseting user 1 password to ${ADMIN_PASS}..."
+    drush user-password ${ADMIN_NAME} --password=${ADMIN_PASS}
+    ;;
+  'd8'*)
+    echo "Running Drush Cache Rebuild..."
+    drush cr
+
+    echo "Set User 1 username to ${ADMIN_USER}..."
+    drush sql-query "UPDATE users_field_data SET mail=\"${ADMIN_EMAIL}\", name=\"${ADMIN_USER}\" WHERE uid=1"
+
+    echo "Reseting user 1 password to ${ADMIN_PASS}..."
+    drush user-password ${ADMIN_NAME} --password=${ADMIN_PASS}
+    ;;
+  'wp'*)
+    echo "Set User 1 username to ${ADMIN_USER}..."
+    echo "Reseting user 1 password to ${ADMIN_PASS}..."
+    wp user update 1 --user_login="${ADMIN_NAME}" --user_pass="${ADMIN_PASS}" --user_email="${ADMIN_EMAIL}"
+    ;;
+esac

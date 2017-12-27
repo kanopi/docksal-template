@@ -8,20 +8,39 @@
 ##
 ##
 
+SOURCE="${BASH_SOURCE[0]}"
+DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+. $DIR/helper_functions
+
 if [ -z $TERMINUS_TOKEN ]; then
-  echo "TERMINUS_TOKEN must be present in the docksal-local.env"
+  echo-red "TERMINUS_TOKEN must be present in the docksal-local.env"
   exit 1
 fi
 
 if [ $1 = 'install' ]; then
+  ## Install Terminus
+  echo-yellow "Installing Terminus..."
+  composer global require -n hirak/prestissimo consolidation/cgr
+  cgr pantheon-systems/terminus
 
-## Install Terminus
-echo "Installing Terminus..."
-composer global require -n hirak/prestissimo
-cgr pantheon-systems/terminus
+  if [ ! -d ~/.terminus/plugins ]; then
+    mkdir ~/.terminus/plugins
+  fi
 
-elif [ $1 = 'login' ]; then
-  terminus auth:login --machine-token=$TERMINUS_TOKEN
+  if [ ! -d ~/.terminus/plugins/terminus-rsync-plugin ]; then
+    echo-yellow "Installing Terminus Rsync Plugin..."
+    composer create-project --no-dev -d ~/.terminus/plugins pantheon-systems/terminus-rsync-plugin:~1
+  fi
+fi
+
+if [ command -v terminus > /dev/null 2>&1 ]; then
+  if [ $1 = 'login' ]; then
+    terminus auth:login --machine-token=$TERMINUS_TOKEN
+  else
+    terminus $*
+  fi
 else
-  terminus $*
+  echo-red "Pantheon's Terminus CLI tool is not installed."
+  echo-yellow "Run: fin terminus install"
+  exit 1
 fi

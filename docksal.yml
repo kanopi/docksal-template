@@ -26,15 +26,24 @@ services:
     extends:
       file: ${HOME}/.docksal/stacks/services.yml
       service: cli
+    image: docksal/cli:1.3-php${PHP}
     environment:
       - PANTHEON_SITE
       - PANTHEON_ENV
       - TERMINUS_EMAIL
       - TERMINUS_TOKEN
       - VIRTUAL_HOST
+      - MYSQL_USER
+      - MYSQL_DATABASE
+      - MYSQL_PASSWORD
+      - SITE_NAME
+      - ADMIN_USER
+      - ADMIN_PASS
+      - ADMIN_EMAIL
+      - HOSTING
     volumes:
       - ${PROJECT_ROOT}/.docksal/etc/drush:/etc/drush:ro
-      - ${PROJECT_ROOT}/.docksal/etc/wordpress:/home/docker/.wp-cli:ro
+      - ${PROJECT_ROOT}/.docksal/etc/wp-cli:/home/docker/.wp-cli:ro
 
   # Redis
   redis:

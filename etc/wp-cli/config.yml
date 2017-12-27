@@ -1,0 +1,12 @@
+@remote.dev:
+  #ssh: dev_user@example.com~/webapps/production
+  #user: admin
+  #path: /var/www/example.com/htdocs
+@remote.staging:
+  #ssh: dev_user@example.com~/webapps/production
+  #user: admin
+  #path: /var/www/example.com/htdocs
+@remote.prod:
+  #ssh: dev_user@example.com~/webapps/production
+  #user: admin
+  #path: /var/www/example.com/htdocs

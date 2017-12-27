@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+#: exec_target = cli
+
+## Run Commands on the site
+##
+## Usage: fin site [arguments]
+##
+
+if [ $1 == 'push' ]; then
+  # Executes a push to the current site
+  # @ToDo: Push Git? Push DB? Push Files?
+elif [ $1 == 'pull' ]; then
+  # Executes a pull from the current site similar to the refresh
+fi
